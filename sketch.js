@@ -9,6 +9,10 @@ let played = false;
 let locked = false;
 let started = false;
 
+// 원본 작품 크기
+const DESIGN_W = 1242;
+const DESIGN_H = 886;
+
 
 function preload() {
 
@@ -27,8 +31,9 @@ function preload() {
 
 function setup() {
 
-  //createCanvas(1225, 886);
-  createCanvas(1242, 886);
+  createCanvas(windowWidth, windowHeight);
+  imageMode(CORNER);
+
   
   song = loadSound("1-2.mp3", () => {
 
@@ -48,6 +53,24 @@ function setup() {
 }
 
 function draw() {
+
+
+   // 원본 작품 비율을 유지하면서 화면 안에 맞춤
+  const scaleValue = min(
+    width / DESIGN_W,
+    height / DESIGN_H
+  );
+
+  const drawW = DESIGN_W * scaleValue;
+  const drawH = DESIGN_H * scaleValue;
+
+  const offsetX = (width - drawW) / 2;
+  const offsetY = (height - drawH) / 2;
+
+  push();
+
+  translate(offsetX, offsetY);
+  scale(scaleValue);
 
  // drawBackground();
   drawMagicDust();
