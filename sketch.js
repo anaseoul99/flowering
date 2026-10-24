@@ -5,8 +5,7 @@ let animals = [];
 let blobs = [];
 let sticks = [];
 
-let song;
-let fft;
+let speaker;
 let played = false;
 let locked = false;
 let started = false;
@@ -25,18 +24,11 @@ function preload() {
   imgs.push(loadImage("gross.png"));
   imgs.push(loadImage("rainbow.png"));
   imgs.push(loadImage("cloud.png"));
-
-  song = loadSound("1-2.mp3");
 }
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   imageMode(CORNER);
-
-  song.setVolume(1);
-
-  fft = new p5.FFT();
-  fft.setInput(song);
 
   generateArtwork();
 }
@@ -91,28 +83,15 @@ function generateBackground() {
 function drawBackground() {
   background(255);
 
-  if (fft && song && song.isPlaying()) {
-    fft.analyze();
-  }
-
-  let bass = fft ? fft.getEnergy("bass") : 0;
-  let mid = fft ? fft.getEnergy("mid") : 0;
-
   noStroke();
 
   for (let b of blobs) {
-    let s = b.size + map(bass, 0, 255, 0, 120);
-    let offsetX = sin(frameCount * 0.01 + b.y) * map(mid, 0, 255, 0, 25);
-    let offsetY = cos(frameCount * 0.01 + b.x) * map(mid, 0, 255, 0, 15);
-
-    fill(b.color[0], b.color[1], b.color[2], map(bass, 0, 255, 20, 70));
-    ellipse(b.x + offsetX, b.y + offsetY, s);
+    fill(b.color[0], b.color[1], b.color[2], 20);
+    ellipse(b.x, b.y, b.size);
   }
 
-  let moonSize = 220 + map(bass, 0, 255, 0, 35);
-
   fill(140, 80, 255, 140);
-  circle(width * 0.82, height * 0.18, moonSize);
+  circle(width * 0.82, height * 0.18, 220);
 }
 
 function generateMagicDust() {
@@ -177,19 +156,16 @@ function generateLayout() {
   addPieces(imgs[3], phone ? 3 : 5, 90, 150);
 }
 
+function isOn() {
+  return locked || (speaker && !speaker.paused);
+}
+
 function drawAnimals() {
   imageMode(CENTER);
 
-  const playing = song && song.isPlaying();
+  const playing = isOn();
   const phone = width < 600;
 
-  if (fft && playing) {
-    fft.analyze();
-  }
-
-  smoothBass = lerp(smoothBass, fft && playing ? fft.getEnergy("bass") : 0, 0.03);
-  smoothMid = lerp(smoothMid, fft && playing ? fft.getEnergy("mid") : 0, 0.03);
-  smoothTreble = lerp(smoothTreble, fft && playing ? fft.getEnergy("treble") : 0, 0.03);
   motionEnv = lerp(motionEnv, playing ? 1 : 0, 0.05);
 
   const now = millis() * 0.001;
@@ -197,10 +173,9 @@ function drawAnimals() {
   for (let a of animals) {
     const t = now * 1.15 * a.speed + a.phase;
     const reach = a.w * (phone ? 0.62 : 0.36) * motionEnv;
-    const breath = 1 + smoothBass / 500;
 
-    const dx = sin(t) * reach * breath;
-    const dy = cos(t * 0.82) * reach * 0.72 * breath;
+    const dx = sin(t) * reach;
+    const dy = cos(t * 0.82) * reach * 0.72;
     const spin = a.angle + sin(t * 0.7) * 0.18 * motionEnv;
     const s = 1 + sin(t * 0.9) * 0.045 * motionEnv;
 
@@ -208,7 +183,6 @@ function drawAnimals() {
     translate(a.x + dx, a.y + dy);
     rotate(spin);
     scale(s);
-    tint(255, 255 - motionEnv * map(smoothTreble, 0, 180, 0, 30));
     image(a.img, 0, 0, a.w, a.h);
     pop();
   }
@@ -217,22 +191,35 @@ function drawAnimals() {
   imageMode(CORNER);
 }
 
+function speakerAudio() {
+  if (!speaker) {
+    speaker = new Audio("1-2.mp3");
+    speaker.setAttribute("playsinline", "");
+    speaker.preload = "auto";
+  }
+  return speaker;
+}
+
 function triggerSound() {
-  if (!song) return;
   if (millis() - lastTrigger < 400) return;
   lastTrigger = millis();
 
-  userStartAudio();
-  getAudioContext().resume();
+  const audio = speakerAudio();
 
-  if (song.isPlaying()) {
-    song.stop();
+  if (!audio.paused) {
+    audio.pause();
+    audio.currentTime = 0;
     locked = false;
   } else {
-    song.play();
     locked = true;
     played = true;
     started = true;
+    const playedAudio = audio.play();
+    if (playedAudio) {
+      playedAudio.catch(() => {
+        locked = false;
+      });
+    }
   }
 }
 
