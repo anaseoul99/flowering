@@ -1,4 +1,4 @@
-//v1
+//vv1
 
 let imgs = [];
 let animals = [];
@@ -11,6 +11,11 @@ let played = false;
 let locked = false;
 let started = false;
 let lastTrigger = 0;
+
+let smoothBass = 0;
+let smoothMid = 0;
+let smoothTreble = 0;
+let motionEnv = 0;
 
 const DESIGN_W = 1242;
 const DESIGN_H = 886;
@@ -156,9 +161,9 @@ function addPieces(img, count, minW, maxW) {
       y: random(h * 0.3, max(h * 0.3, height - h * 0.3)),
       w: w,
       h: h,
-      angle: random(-PI / 8, PI / 8),
+      angle: random(-PI / 14, PI / 14),
       phase: random(TWO_PI),
-      speed: random(0.6, 1.4)
+      speed: random(0.85, 1.45)
     });
   }
 }
@@ -176,33 +181,34 @@ function drawAnimals() {
   imageMode(CENTER);
 
   const playing = song && song.isPlaying();
+  const phone = width < 600;
 
   if (fft && playing) {
     fft.analyze();
   }
 
-  let bass = fft && playing ? fft.getEnergy("bass") : 0;
-  let mid = fft && playing ? fft.getEnergy("mid") : 0;
-  let treble = fft && playing ? fft.getEnergy("treble") : 0;
+  smoothBass = lerp(smoothBass, fft && playing ? fft.getEnergy("bass") : 0, 0.03);
+  smoothMid = lerp(smoothMid, fft && playing ? fft.getEnergy("mid") : 0, 0.03);
+  smoothTreble = lerp(smoothTreble, fft && playing ? fft.getEnergy("treble") : 0, 0.03);
+  motionEnv = lerp(motionEnv, playing ? 1 : 0, 0.05);
+
+  const now = millis() * 0.001;
 
   for (let a of animals) {
-    let dx = 0;
-    let dy = 0;
-    let spin = a.angle;
-    let s = 1;
+    const t = now * 1.15 * a.speed + a.phase;
+    const reach = a.w * (phone ? 0.62 : 0.36) * motionEnv;
+    const breath = 1 + smoothBass / 500;
 
-    if (playing) {
-      dx = sin(frameCount * 0.03 * a.speed + a.phase) * map(bass, 0, 255, 0, 22);
-      dy = cos(frameCount * 0.025 * a.speed + a.phase) * map(mid, 0, 255, 0, 16);
-      spin = a.angle + sin(frameCount * 0.04 * a.speed + a.phase) * map(mid, 0, 255, 0, 0.22);
-      s = map(bass, 0, 255, 1, 1.15);
-    }
+    const dx = sin(t) * reach * breath;
+    const dy = cos(t * 0.82) * reach * 0.72 * breath;
+    const spin = a.angle + sin(t * 0.7) * 0.18 * motionEnv;
+    const s = 1 + sin(t * 0.9) * 0.045 * motionEnv;
 
     push();
     translate(a.x + dx, a.y + dy);
     rotate(spin);
     scale(s);
-    tint(255, playing ? map(treble, 0, 255, 180, 255) : 255);
+    tint(255, 255 - motionEnv * map(smoothTreble, 0, 180, 0, 30));
     image(a.img, 0, 0, a.w, a.h);
     pop();
   }
@@ -228,8 +234,6 @@ function triggerSound() {
     played = true;
     started = true;
   }
-
-  generateArtwork();
 }
 
 function mousePressed() {
